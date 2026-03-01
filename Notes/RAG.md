@@ -248,37 +248,36 @@ RAG = Your Data + Similarity Search + LLM
 
 RAG has **2 main pipelines** that work together:
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        RAG ARCHITECTURE                          │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────── PIPELINE 1: INDEXING ──────────────────┐      │
-│  │  (Done ONCE — prepare your data)                      │      │
-│  │                                                        │      │
-│  │  Data Source ─→ Chunking ─→ Embeddings ─→ Vector DB   │      │
-│  │  (PDF/CSV/    (Split into  (Convert to   (Store for   │      │
-│  │   Web/Docs)    pieces)      vectors)      searching)  │      │
-│  └────────────────────────────────────────────────────────┘      │
-│                                                                  │
-│  ┌─────────────── PIPELINE 2: RETRIEVAL ─────────────────┐      │
-│  │  (Done EVERY TIME a user asks a question)             │      │
-│  │                                                        │      │
-│  │  User Question ─→ Embed Question ─→ Search Vector DB  │      │
-│  │       │                                    │           │      │
-│  │       │            ┌───────────────────────┘           │      │
-│  │       │            ↓                                   │      │
-│  │       │     Relevant Chunks                            │      │
-│  │       │            │                                   │      │
-│  │       ↓            ↓                                   │      │
-│  │   ┌──────────────────────┐                            │      │
-│  │   │    LLM (GPT/Claude)  │                            │      │
-│  │   │  Question + Chunks   │                            │      │
-│  │   │  = Final Answer      │                            │      │
-│  │   └──────────────────────┘                            │      │
-│  └────────────────────────────────────────────────────────┘      │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph P1 [" 📥 Pipeline 1 — INDEXING  \n one-time setup "]
+        DS["📁 Data Source\nPDF / CSV / Web / Docs"]:::source
+        CH["✂️ Chunking\nSplit into pieces"]:::step
+        EM["🔢 Embeddings\nConvert to vectors"]:::step
+        VDB[("🗄️ Vector DB\nStore for searching")]:::db
+        DS --> CH --> EM --> VDB
+    end
+
+    subgraph P2 [" 🔍 Pipeline 2 — RETRIEVAL  \n runs on every user question "]
+        UQ(["❓ User Question"]):::input
+        EQ["🔢 Embed Question\nsame embedding model"]:::step
+        SV["🔍 Search Vector DB\ncosine similarity"]:::step
+        RC["📦 Relevant Chunks\nTop K results"]:::step
+        LLM["🤖 LLM\nGPT / Claude / Gemini"]:::llm
+        ANS(["✅ Final Answer"]):::output
+        UQ --> EQ --> SV --> RC --> LLM
+        UQ --> LLM
+        LLM --> ANS
+    end
+
+    VDB --> SV
+
+    classDef source   fill:#e8f4fd,stroke:#2196F3,color:#0d47a1
+    classDef step     fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef db       fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef input    fill:#fff8e1,stroke:#FFC107,color:#795548,font-weight:bold
+    classDef llm      fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ---
@@ -435,20 +434,23 @@ This runs **every time a user asks a question**: (Pipeline 2 from the architectu
 
 ### The Flow:
 
-```
-User Question: "What is supervised learning?"
-         ↓
-Step 1:  Embed the question → [0.045, 0.032, ...] (same embedding model!)
-         ↓
-Step 2:  Search Vector DB → Find chunks with similar vectors
-         ↓
-Step 3:  Get top K relevant chunks (e.g., top 3-5)
-         ↓
-Step 4:  Filter/Rank chunks (optional — remove low relevance ones)
-         ↓
-Step 5:  Build prompt = System Prompt + Relevant Chunks + User Question
-         ↓
-Step 6:  Send to LLM → Get answer
+```mermaid
+flowchart TD
+    Q(["❓ User Question\n'What is supervised learning?'"]):::input
+    E["🔢 Step 1: Embed Question\n→ vector &#91;0.045, 0.032, ...&#93;"]:::step
+    S["🔍 Step 2: Search Vector DB\nFind similar vectors"]:::step
+    K["📦 Step 3: Get Top-K Chunks\ne.g. top 3–5 results"]:::step
+    F["⚖️ Step 4: Filter & Rank\nRemove low-relevance chunks"]:::step
+    P["📝 Step 5: Build Prompt\nSystem Prompt + Chunks + Question"]:::step
+    L["🤖 Step 6: LLM\nGPT / Claude / Gemini"]:::llm
+    A(["✅ Final Answer"]):::output
+
+    Q --> E --> S --> K --> F --> P --> L --> A
+
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step   fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### What the LLM Actually Sees:
@@ -992,29 +994,33 @@ results = vectorstore.similarity_search(
 
 ### RAG Optimization Summary:
 
-```
-┌────────────────────────────────────────────────────┐
-│            RAG OPTIMIZATION TECHNIQUES             │
-├────────────────────────────────────────────────────┤
-│                                                    │
-│  INDEXING STAGE:                                   │
-│  ├── Smart chunking (size + overlap)               │
-│  ├── Rich metadata (source, page, date, tags)      │
-│  └── Multiple embedding models                     │
-│                                                    │
-│  RETRIEVAL STAGE:                                  │
-│  ├── Hybrid search (vector + keyword)              │
-│  ├── Multi-query expansion                         │
-│  ├── Re-ranking (cross-encoder)                    │
-│  ├── Metadata filtering                            │
-│  └── Contextual compression                        │
-│                                                    │
-│  GENERATION STAGE:                                 │
-│  ├── Better prompts (few-shot, CoT)                │
-│  ├── Cite sources in response                      │
-│  └── Hallucination detection                       │
-│                                                    │
-└────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph IDX [" 📥 Indexing Stage "]
+        I1["✅ Smart chunking\nsize + overlap tuning"]:::idx
+        I2["✅ Rich metadata\nsource, page, date, tags"]:::idx
+        I3["✅ Multiple embedding models"]:::idx
+    end
+
+    subgraph RET [" 🔍 Retrieval Stage "]
+        R1["✅ Hybrid search\nvector + keyword (BM25)"]:::ret
+        R2["✅ Multi-query expansion"]:::ret
+        R3["✅ Re-ranking\ncross-encoder"]:::ret
+        R4["✅ Metadata filtering"]:::ret
+        R5["✅ Contextual compression"]:::ret
+    end
+
+    subgraph GEN [" ✍️ Generation Stage "]
+        G1["✅ Better prompts\nfew-shot, CoT"]:::gen
+        G2["✅ Cite sources"]:::gen
+        G3["✅ Hallucination detection"]:::gen
+    end
+
+    IDX --> RET --> GEN
+
+    classDef idx fill:#e8f4fd,stroke:#2196F3,color:#0d47a1
+    classDef ret fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef gen fill:#e0f2f1,stroke:#009688,color:#004d40
 ```
 
 ---
@@ -1226,31 +1232,28 @@ The user's vague query → BAD embeddings → BAD search results
 
 Instead of embedding the **user's question**, ask the LLM to **generate a hypothetical answer** first, then embed THAT.
 
-```
-┌──────────────────────────────────────────────────────┐
-│                  NORMAL RAG                          │
-│                                                      │
-│  User Query ──→ Embed Query ──→ Search Vector DB     │
-│  "that thing     [0.1, 0.3,     Finds vague matches  │
-│   where servers   0.2, ...]                          │
-│   talk"                                              │
-└──────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph NORMAL [" 🔴 Normal RAG "]
+        NQ(["❓ Vague Query\n'that thing where\nservers talk'"]):::input
+        NE["🔢 Embed Query\n&#91;0.1, 0.3, 0.2...&#93;"]:::embed
+        NS["🔍 Search Vector DB\n😕 Vague matches"]:::bad
+        NQ --> NE --> NS
+    end
 
-┌──────────────────────────────────────────────────────┐
-│                  HyDE RAG                            │
-│                                                      │
-│  User Query ──→ LLM generates hypothetical document  │
-│  "that thing     "REST APIs enable server-to-server  │
-│   where servers   communication using HTTP. gRPC     │
-│   talk"          uses Protocol Buffers for fast       │
-│                  microservice communication..."       │
-│                       ↓                              │
-│               Embed this hypothetical doc             │
-│                  [0.8, 0.7, 0.9, ...]                │
-│                       ↓                              │
-│               Search Vector DB                        │
-│               → MUCH better matches!                  │
-└──────────────────────────────────────────────────────┘
+    subgraph HYDE [" 🟢 HyDE RAG "]
+        HQ(["❓ Same Vague Query"]):::input
+        HL["🤖 LLM generates\nhypothetical answer:\n'REST APIs enable server-to-server\ncommunication via HTTP..'"]:::llm
+        HE["🔢 Embed the ANSWER\n&#91;0.8, 0.7, 0.9...&#93;"]:::embed
+        HS["🔍 Search Vector DB\n✅ Much better matches!"]:::good
+        HQ --> HL --> HE --> HS
+    end
+
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef embed fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef llm   fill:#fce4ec,stroke:#E91E63,color:#880e4f
+    classDef bad   fill:#ffebee,stroke:#F44336,color:#b71c1c
+    classDef good  fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
 ```
 
 ### Why HyDE Works:
@@ -1537,27 +1540,28 @@ RETURN dep.name
 
 The most powerful approach **combines BOTH**:
 
-```
-┌───────────────────────────────────────────────────────┐
-│                    GraphRAG                            │
-│                                                       │
-│   User Query                                          │
-│       ↓                                               │
-│   ┌───────────────┐    ┌───────────────────┐          │
-│   │ Vector Search │    │ Graph Traversal   │          │
-│   │ (Similarity)  │    │ (Relationships)   │          │
-│   │               │    │                   │          │
-│   │ "Find chunks  │    │ "Find connected   │          │
-│   │  about FS"    │    │  entities to FS"  │          │
-│   └───────┬───────┘    └────────┬──────────┘          │
-│           ↓                     ↓                     │
-│   Chunks about FS     Path, OS, Streams (related)     │
-│           ↓                     ↓                     │
-│       ┌─────────────────────────────┐                 │
-│       │   MERGE + Rank + Send to   │                 │
-│       │   LLM with full context    │                 │
-│       └─────────────────────────────┘                 │
-└───────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Q(["🔍 User Query"]):::input --> VS & GT
+
+    VS["📚 Vector Search\nSimilarity-based\n'Find chunks about FS'"]:::vector
+    GT["🕸️ Graph Traversal\nRelationship-based\n'Find entities connected to FS'"]:::graph
+
+    VS --> VC["📄 Chunks about FS\n(text similarity)"]:::result
+    GT --> GC["🔗 Path, OS, Streams\n(connected entities)"]:::result
+
+    VC --> M["🔀 Merge + Rank\nCombine both results"]:::merge
+    GC --> M
+    M --> LLM["🤖 LLM\nFull context answer"]:::llm
+    LLM --> A(["✅ Answer"]):::output
+
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef vector fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef graph  fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef result fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef merge  fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Neo4j with Vector Embeddings:
@@ -1612,53 +1616,94 @@ Not all RAG systems are the same. The basic RAG we built in Rag_1.py is called *
 
 ### The RAG Evolution:
 
-```
-Naive RAG → Advanced RAG → Modular RAG
-    ↓            ↓              ↓
-  Simple     Optimized      Mix & match
-  pipeline    pipeline       components
+```mermaid
+flowchart LR
+    N["🟢 Naive RAG\nSimple pipeline"]:::naive
+    A["🔵 Advanced RAG\nOptimized pipeline"]:::advanced
+    M["🟣 Modular RAG\nMix & match components"]:::modular
+    N -->|"add optimizations"| A -->|"make composable"| M
+    classDef naive    fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef advanced fill:#e3f2fd,stroke:#1976D2,color:#0d47a1
+    classDef modular  fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
 ```
 
 ### 1. Naive RAG (What We Built)
 
+```mermaid
+flowchart LR
+    Q(["❓ Query"]):::input --> E["🔢 Embed"]:::step --> S["🔍 Search"]:::step --> K["📦 Top K Chunks"]:::step --> L["🤖 LLM"]:::llm --> A(["✅ Answer"]):::output
+    style Q fill:#e8f4fd,stroke:#2196F3,color:#0d47a1
+    style E fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    style S fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    style K fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    style L fill:#fce4ec,stroke:#E91E63,color:#880e4f
+    style A fill:#e0f2f1,stroke:#009688,color:#004d40
 ```
-Query → Embed → Search → Top K Chunks → LLM → Answer
-
-✅ Simple to build (our Rag_1.py)
-❌ No query optimization
-❌ No result validation
+✅ Simple to build (our Rag_1.py)  
+❌ No query optimization  
+❌ No result validation  
 ❌ Retrieves irrelevant chunks sometimes
-```
 
 ### 2. Advanced RAG
 
 Adds **pre-retrieval** and **post-retrieval** optimization:
 
-```
-Query → Query Translation → Multi-Query → Search → Re-Rank → Compress → LLM → Answer
-  ↑         ↑                    ↑           ↑        ↑          ↑
-  Pre-retrieval optimizations    |    Post-retrieval optimizations
+```mermaid
+flowchart LR
+    Q(["❓ Query"]):::input
+    T["✏️ Query\nTranslation"]:::pre
+    MQ["📋 Multi-Query"]:::pre
+    S["🔍 Search"]:::step
+    RR["⚖️ Re-Rank"]:::post
+    C["✂️ Compress"]:::post
+    L["🤖 LLM"]:::llm
+    A(["✅ Answer"]):::output
+    Q --> T --> MQ --> S --> RR --> C --> L --> A
+
+    subgraph PRE ["Pre-Retrieval Optimizations"]
+        T
+        MQ
+    end
+    subgraph POST ["Post-Retrieval Optimizations"]
+        RR
+        C
+    end
+
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef pre   fill:#e3f2fd,stroke:#1976D2,color:#0d47a1
+    classDef step  fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef post  fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef llm   fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### 3. Corrective RAG (CRAG)
 
 The retrieval **checks itself** — if retrieved docs aren't relevant, it **corrects** the search:
 
-```
-Query → Search → Relevance Check (LLM grades each chunk)
-                        ↓
-              ┌─────────┴─────────┐
-              ↓                   ↓
-         RELEVANT              NOT RELEVANT
-              ↓                   ↓
-         Use chunks         Trigger correction:
-              ↓               - Rewrite query
-              ↓               - Search web instead
-              ↓               - Use different DB
-              ↓                   ↓
-              └─────────┬─────────┘
-                        ↓
-                    LLM → Answer
+```mermaid
+flowchart TD
+    Q(["🔍 Query"]):::input --> S["🔎 Search\nVector DB"]:::step
+    S --> G["🤖 LLM Grades\nEach Chunk"]:::llm
+    G -->|"✅ RELEVANT"| USE["📄 Use chunks\nfor answer"]:::good
+    G -->|"❌ NOT RELEVANT"| FIX["⚠️ Trigger Correction"]:::bad
+    FIX --> R1["🔄 Rewrite query"]:::fix
+    FIX --> R2["🌐 Search web instead"]:::fix
+    FIX --> R3["🗄️ Try different DB"]:::fix
+    USE --> LLM["🤖 LLM → Answer"]:::llmgen
+    R1 --> LLM
+    R2 --> LLM
+    R3 --> LLM
+    LLM --> A(["✅ Answer"]):::output
+
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step   fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef llm    fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef good   fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
+    classDef bad    fill:#ffebee,stroke:#F44336,color:#b71c1c
+    classDef fix    fill:#fce4ec,stroke:#E91E63,color:#880e4f
+    classDef llmgen fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 **How the "grading" works:**
@@ -1680,31 +1725,42 @@ Answer: RELEVANT or NOT_RELEVANT"""
 
 The LLM **evaluates its own output** and decides if it needs more retrieval:
 
-```
-Query → Search → Generate Answer → Self-Evaluate
-                                        ↓
-                              ┌─────────┴─────────┐
-                              ↓                   ↓
-                          GOOD answer         BAD answer
-                              ↓                   ↓
-                          Return it          Retrieve more
-                                             chunks & retry
+```mermaid
+flowchart TD
+    Q(["🔍 Query"]):::input --> S["🔎 Search\nVector DB"]:::step
+    S --> GEN["🤖 Generate Answer"]:::llm
+    GEN --> EVAL{"🧠 Self-Evaluate\nIs answer grounded?"}:::eval
+    EVAL -->|"✅ GOOD"| DONE(["✅ Return Answer"]):::good
+    EVAL -->|"❌ BAD"| MORE["🔄 Retrieve MORE /\nDIFFERENT chunks"]:::bad
+    MORE --> GEN
+
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step  fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef llm   fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef eval  fill:#fff8e1,stroke:#FFC107,color:#795548,font-weight:bold
+    classDef good  fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
+    classDef bad   fill:#ffebee,stroke:#F44336,color:#b71c1c
 ```
 
 ### 5. Agentic RAG
 
 The RAG is powered by an **AI Agent** that decides what to do dynamically:
 
-```
-Query → Agent (LLM with tools)
-              ↓
-        Agent DECIDES:
-        ├── "I need to search the vector DB"      → tool: vector_search()
-        ├── "Let me check the graph DB too"        → tool: graph_query()
-        ├── "Results aren't good, let me rewrite"  → tool: rewrite_query()
-        ├── "I need to search the web"             → tool: web_search()
-        ├── "Let me verify this answer"            → tool: fact_check()
-        └── "Now I can answer"                     → generate response
+```mermaid
+flowchart TD
+    Q(["🔍 Query"]):::input --> AG["🤖 Agent\nLLM with Tools"]:::agent
+    AG -->|"search docs"| T1["🗄️ vector_search()"]:::tool
+    AG -->|"check relations"| T2["🕸️ graph_query()"]:::tool
+    AG -->|"bad results"| T3["✏️ rewrite_query()"]:::tool
+    AG -->|"need latest info"| T4["🌐 web_search()"]:::tool
+    AG -->|"verify answer"| T5["✅ fact_check()"]:::tool
+    T1 & T2 & T3 & T4 & T5 -.->|"results"| AG
+    AG -->|"done"| ANS(["✅ Final Response"]):::output
+
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef agent  fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef tool   fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 > **Like our weather_agent.py / project_builder_agent.py** — but instead of tools like `get_weather` and `create_file`, the agent has tools like `search_vectordb`, `search_web`, `rewrite_query`.
@@ -1725,40 +1781,41 @@ Example:
   TAG: Generates SQL → SELECT SUM(sales) FROM data WHERE quarter='Q3' → $4.2M (exact!)
 ```
 
-```
-┌────────────────────────────────────────────┐
-│                    TAG                     │
-│                                            │
-│  User Query                                │
-│      ↓                                     │
-│  LLM generates SQL / DataFrame query       │
-│      ↓                                     │
-│  Execute on actual database / table         │
-│      ↓                                     │
-│  Get precise results (numbers, rows)        │
-│      ↓                                     │
-│  LLM formats answer with exact data        │
-└────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Q(["🔍 User Query\n'Total sales in Q3?'"]):::input
+    GEN["🤖 LLM generates\nSQL / DataFrame query"]:::llm
+    EX["⚙️ Execute on Database\n/ Table"]:::step
+    RES["📊 Precise Results\nnumbers, rows"]:::result
+    FMT["🤖 LLM formats answer\nwith exact data"]:::llm
+    ANS(["✅ 'Q3 sales: $4.2M'"]):::output
+    Q --> GEN --> EX --> RES --> FMT --> ANS
+
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef step   fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef result fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### 7. Adaptive RAG
 
 Routes the query to the **right RAG pipeline** based on query type:
 
-```
-Query → Router (LLM classifies the query)
-              ↓
-     ┌────────┼────────┐
-     ↓        ↓        ↓
-  Simple    Complex   Tabular
-  query     query     query
-     ↓        ↓        ↓
-  Naive    Advanced    TAG
-  RAG      RAG         RAG
-     ↓        ↓        ↓
-     └────────┼────────┘
-              ↓
-           Answer
+```mermaid
+flowchart TD
+    Q(["🔍 Query"]):::input --> R{"🤖 Router\nLLM classifies"}:::router
+    R -->|"simple"| N["🟢 Naive RAG"]:::naive
+    R -->|"complex"| A["🔵 Advanced RAG"]:::advanced
+    R -->|"tabular"| T["🟣 TAG RAG\nSQL/DataFrame"]:::tag
+    N & A & T --> ANS(["✅ Answer"]):::output
+
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router   fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef naive    fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef advanced fill:#e3f2fd,stroke:#1976D2,color:#0d47a1
+    classDef tag      fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### RAG Variants Comparison:

@@ -88,8 +88,22 @@ response = client.chat.completions.create(
 ```
 
 **The Agentic Loop (chat_3_auto.py):**
-```
-User Input → LLM Analyses → LLM Thinks → LLM Thinks Again → Output → Validate → Final Result
+```mermaid
+flowchart LR
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm       fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef step      fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef output    fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
+
+    USER["🗣️ User Input"]:::input
+    ANALYSE["🧠 Analyse"]:::llm
+    THINK1["💭 Think"]:::llm
+    THINK2["💭 Think Again"]:::llm
+    GEN["📝 Output"]:::step
+    VALIDATE["✅ Validate"]:::step
+    RESULT["🎯 Final Result"]:::output
+
+    USER --> ANALYSE --> THINK1 --> THINK2 --> GEN --> VALIDATE --> RESULT
 ```
 
 The steps follow a sequence: `analyse` → `think` → `output` → `validate` → `result`
@@ -962,20 +976,24 @@ for _ in range(10):  # 10 epochs (iterations over the data)
 | `loss.item()` | Converts tensor to a Python number for printing |
 
 **The Training Flow Visualized:**
-```
-Input IDs → Model → Logits (predictions)
-                        ↓
-              Compare with Target IDs
-                        ↓
-                    Loss (error)
-                        ↓
-                  loss.backward()     ← Calculate gradients
-                        ↓
-                  optimizer.step()    ← Update weights
-                        ↓
-                  optimizer.zero_grad() ← Reset for next round
-                        ↓
-                    Repeat 10x
+```mermaid
+flowchart TD
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm       fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef step      fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef output    fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
+
+    INPUT["📥 Input IDs"]:::input
+    MODEL["🧠 Model\nForward Pass"]:::llm
+    LOGITS["📊 Logits\nPredictions"]:::step
+    COMPARE["⚖️ Compare with\nTarget IDs"]:::step
+    LOSS["❗ Loss\nError"]:::step
+    BACKWARD["↩️ loss.backward\nCalculate Gradients"]:::llm
+    OPT_STEP["➡️ optimizer.step\nUpdate Weights"]:::llm
+    ZERO["🔄 optimizer.zero_grad\nReset Gradients"]:::step
+    REPEAT["🔁 Repeat x10"]:::output
+
+    INPUT --> MODEL --> LOGITS --> COMPARE --> LOSS --> BACKWARD --> OPT_STEP --> ZERO --> REPEAT
 ```
 
 #### Step 10: Test the Fine-Tuned Model
@@ -1143,40 +1161,57 @@ print(output)
 
 ### The Complete Fine-Tuning Flow Visualized
 
-```
-┌─────────────────────────────────────────────────────┐
-│                  FINE-TUNING PIPELINE                │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  1. Google Colab (GPU: T4)                         │
-│     └── !pip install transformers peft torch        │
-│                                                     │
-│  2. Hugging Face                                    │
-│     ├── Download base model (gemma-3-1b-it)        │
-│     ├── Download tokenizer                          │
-│     └── HF_TOKEN for gated models                  │
-│                                                     │
-│  3. Prepare Data                                    │
-│     ├── Format as conversations                     │
-│     ├── apply_chat_template()                       │
-│     └── Shift tokens: input_ids & target_ids        │
-│                                                     │
-│  4. Choose Fine-Tuning Method                       │
-│     ├── Full Parameter → All weights change         │
-│     └── LoRA → Only small adapters change           │
-│                                                     │
-│  5. Training Loop                                   │
-│     ├── Forward pass → Predict                      │
-│     ├── Loss → How wrong?                           │
-│     ├── Backward pass → Gradients                   │
-│     └── Optimizer step → Update weights             │
-│                                                     │
-│  6. Deploy                                          │
-│     ├── Hugging Face Hub (push_to_hub)              │
-│     ├── Replicate (API hosting)                     │
-│     └── Self-host with Ollama                       │
-│                                                     │
-└─────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step      fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef llm       fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output    fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
+    classDef embed     fill:#fff8e1,stroke:#FFC107,color:#795548
+
+    subgraph SETUP ["☁️ 1  Google Colab  GPU T4"]
+        INSTALL["pip install transformers peft torch"]
+    end
+
+    subgraph HF ["🤗 2  Hugging Face"]
+        MODEL_DL["Download base model\ngemma-3-1b-it"]
+        TOK_DL["Download tokenizer"]
+        HF_TOKEN["HF_TOKEN for gated models"]
+    end
+
+    subgraph DATA ["📋 3  Prepare Data"]
+        FORMAT["Format as conversations"]
+        TEMPLATE["apply_chat_template"]
+        SHIFT["Shift tokens\ninput_ids & target_ids"]
+    end
+
+    subgraph METHOD ["🔀 4  Choose Fine-Tuning Method"]
+        FULL["Full Parameter\nAll weights change"]
+        LORA["LoRA\nOnly small adapters change"]
+    end
+
+    subgraph TRAIN ["🔄 5  Training Loop"]
+        FWD["Forward pass  Predict"]
+        LOSS_T["Loss  How wrong?"]
+        BWD["Backward pass  Gradients"]
+        OPT["Optimizer step  Update weights"]
+        FWD --> LOSS_T --> BWD --> OPT
+    end
+
+    subgraph DEPLOY ["🚀 6  Deploy"]
+        HF_PUSH["Hugging Face Hub\npush_to_hub"]
+        REPL["Replicate\nAPI hosting"]
+        OLLAMA_D["Self-host with Ollama"]
+    end
+
+    SETUP --> HF --> DATA --> METHOD --> TRAIN --> DEPLOY
+
+    class INSTALL embed
+    class MODEL_DL,TOK_DL,HF_TOKEN input
+    class FORMAT,TEMPLATE,SHIFT step
+    class FULL,LORA llm
+    class FWD,LOSS_T,BWD,OPT llm
+    class HF_PUSH,REPL,OLLAMA_D output
 ```
 
 ---

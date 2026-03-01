@@ -49,47 +49,23 @@ This works **okay**, but has issues:
 
 To improve RAG accuracy, we optimize at **6 different stages** of the pipeline:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    ADVANCED RAG TECHNIQUES                         │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  1. QUERY TRANSLATION                                        │   │
-│  │     Rewrite/improve the user's question before searching     │   │
-│  │     → Multi-Query, RAG Fusion, Decomposition, Step-Back,     │   │
-│  │       HyDE                                                   │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                            ↓                                        │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  2. ROUTING                                                  │   │
-│  │     Send the query to the RIGHT data source                  │   │
-│  │     → Logical routing, Semantic routing                      │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                            ↓                                        │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  3. QUERY CONSTRUCTION                                       │   │
-│  │     Convert natural language → database query language       │   │
-│  │     → Text-to-SQL, Text-to-Cypher, Text-to-Metadata          │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                            ↓                                        │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  4. INDEXING                                                 │   │
-│  │     How you store your data affects retrieval quality         │   │
-│  │     → Chunking strategies, Multi-representation, Hierarchy    │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                            ↓                                        │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  5. RETRIEVAL                                                │   │
-│  │     How you search and rank results                          │   │
-│  │     → Re-ranking, Hybrid search, CRAG (Corrective RAG)       │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                            ↓                                        │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  6. GENERATION                                               │   │
-│  │     How the LLM uses the retrieved context to answer          │   │
-│  │     → Self-RAG, Hallucination check, Citation                │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph ADV [" 🚀 ADVANCED RAG TECHNIQUES "]
+        T1["1. QUERY TRANSLATION\nRewrite/improve the query before searching\nMulti-Query · RAG Fusion · Decomposition · Step-Back · HyDE"]:::qtr
+        T2["2. ROUTING\nSend query to the RIGHT data source\nLogical routing · Semantic routing"]:::route
+        T3["3. QUERY CONSTRUCTION\nNatural language → DB query language\nText-to-SQL · Text-to-Cypher · Text-to-Metadata"]:::constr
+        T4["4. INDEXING\nHow you store data affects retrieval\nChunking · Multi-representation · Hierarchy"]:::idx
+        T5["5. RETRIEVAL\nHow you search and rank results\nRe-ranking · Hybrid search · CRAG"]:::ret
+        T6["6. GENERATION\nHow LLM uses context to answer\nSelf-RAG · Hallucination check · Citation"]:::gen
+        T1 --> T2 --> T3 --> T4 --> T5 --> T6
+    end
+    classDef qtr    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1
+    classDef route  fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef constr fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef idx    fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef ret    fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef gen    fill:#e0f2f1,stroke:#009688,color:#004d40
 ```
 
 > **Key insight:** You don't NEED all 6 techniques. Pick what your use case needs. For a simple coding chatbot, basic RAG is fine. For **legal documents or medical records**, you need multiple layers of optimization.
@@ -123,18 +99,12 @@ That's exactly what Query Translation does — your vague input gets **translate
 
 ### The Core Problem: Ambiguous Input → Ambiguous Output
 
-```
-┌──────────────────────────────────────────────────────┐
-│                                                      │
-│    Garbage In  →  Garbage Out                        │
-│    ──────────     ────────────                       │
-│                                                      │
-│    Vague query  →  Irrelevant chunks  →  Bad answer  │
-│    Good query   →  Relevant chunks    →  Good answer │
-│                                                      │
-│    The QUERY is the weakest link in RAG!             │
-│                                                      │
-└──────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    VQ["Vague Query\n(garbage input)"]:::bad --> VR["Irrelevant Chunks"]:::bad --> BA["❌ Bad Answer"]:::bad
+    GQ["✅ Good Query\n(clear input)"]:::good --> GR["Relevant Chunks"]:::good --> GA["⭐ Good Answer"]:::good
+    classDef bad  fill:#ffebee,stroke:#F44336,color:#b71c1c,font-weight:bold
+    classDef good fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
 ```
 
 If the user doesn't know what they want → they can't ask the right question → the vector DB returns bad chunks → the LLM generates a bad answer.
@@ -189,24 +159,22 @@ But technically **BOTH ends are necessary:**
 
 ### What We Can Do — The Query Translation Techniques
 
-```
-                    User Query
-                        │
-           ┌────────────┼────────────┐
-           ↓            ↓            ↓
-     ┌──────────┐ ┌──────────┐ ┌──────────┐
-     │ Rewrite  │ │ Decompose│ │ Generate  │
-     │          │ │          │ │ Hypothetic│
-     │ Multi-   │ │ Break    │ │ al Docs   │
-     │ Query /  │ │ into sub-│ │ (HyDE)    │
-     │ RAG      │ │ questions│ │           │
-     │ Fusion   │ │          │ │           │
-     └──────────┘ └──────────┘ └──────────┘
-           │            │            │
-           ↓            ↓            ↓
-     More Abstract  Less Abstract  Hypothetical
-     (Step-Back)    (Chain of      Answer
-                     Thought)
+```mermaid
+flowchart TD
+    Q(["❓ User Query"]):::input --> RW & DEC & HY
+    RW["Rewrite/Expand\nMulti-Query · RAG Fusion"]:::rw
+    DEC["✂️ Decompose\nBreak into sub-questions"]:::dec
+    HY["Generate Hypothetical Docs\n(HyDE)"]:::hyd
+    RW --> AB["⬆️ More Abstract\n(Step-Back)"]:::abs
+    DEC --> SP["⬇️ Less Abstract\n(Chain of Thought)"]:::spec
+    HY --> HA["🧠 Hypothetical Answer\nfor embedding"]:::hyout
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef rw    fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef dec   fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef hyd   fill:#fce4ec,stroke:#E91E63,color:#880e4f
+    classDef abs   fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef spec  fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef hyout fill:#ede7f6,stroke:#673AB7,color:#311b92
 ```
 
 Let's dive into each one.
@@ -221,60 +189,32 @@ Instead of searching with **one** query, the LLM generates **multiple different 
 
 ### The Full Architecture:
 
-```
-User Query: "How does authentication work?"
-         │
-         ↓
-┌─────────────────────────────────────┐
-│  LLM (with System Prompt)          │
-│                                     │
-│  System: "Given this user query,    │
-│  generate 3 different versions      │
-│  of this question that would help   │
-│  retrieve relevant documents"       │
-│                                     │
-│  Output:                            │
-│  Q1: "What authentication           │
-│       mechanisms are used?"         │
-│  Q2: "How does JWT login flow       │
-│       work?"                        │
-│  Q3: "What is the session           │
-│       management system?"           │
-└────────┬──────────┬─────────┬───────┘
-         │          │         │
-         ↓          ↓         ↓         ← This is the "FAN-OUT"
-    ┌────────┐ ┌────────┐ ┌────────┐      (queries spread out
-    │Embed Q1│ │Embed Q2│ │Embed Q3│       like a fan)
-    └───┬────┘ └───┬────┘ └───┬────┘
-        ↓          ↓          ↓
-    ┌────────┐ ┌────────┐ ┌────────┐
-    │Vector  │ │Vector  │ │Vector  │   ← Parallel similarity search
-    │DB      │ │DB      │ │DB      │
-    │Search  │ │Search  │ │Search  │
-    └───┬────┘ └───┬────┘ └───┬────┘
-        ↓          ↓          ↓
-   Chunks A    Chunks B    Chunks C
-    [d1,d2,     [d3,d4,     [d5,d2,
-     d3]         d2]         d1]
-        │          │          │
-        └──────────┼──────────┘
-                   ↓
-         ┌─────────────────┐
-         │ INTERSECTION /  │   ← Filter unique chunks
-         │ UNION & RANK    │
-         │ (Deduplication) │
-         └────────┬────────┘
-                  ↓
-         Unique relevant chunks
-         [d1, d2, d3, d4, d5]
-                  ↓
-         ┌─────────────────┐
-         │ Original User   │
-         │ Query + Chunks  │   ← Bring back the ORIGINAL question
-         │ → LLM           │
-         └────────┬────────┘
-                  ↓
-         More accurate response!
+```mermaid
+flowchart TD
+    UQ(["❓ User Query: How does authentication work?"]):::input
+    LLM["🤖 LLM\ngenerate 3 different query versions\n(Fan-Out)"]:::llm
+    Q1["Q1: What authentication mechanisms are used?"]:::q
+    Q2["Q2: How does JWT login flow work?"]:::q
+    Q3["Q3: What is the session management system?"]:::q
+    CA["Chunks A"]:::chunks
+    CB["Chunks B"]:::chunks
+    CC["Chunks C"]:::chunks
+    DEDUP["🔀 Intersection/Union\nRRF Rank Fusion + Deduplication"]:::merge
+    ORG(["❓ Original User Query"]):::input
+    FINAL["🤖 LLM — Original Query + Unique Chunks"]:::llm
+    ANS(["✅ More accurate response!"]):::output
+    UQ --> LLM --> Q1 & Q2 & Q3
+    Q1 -->|"Vector DB"| CA
+    Q2 -->|"Vector DB"| CB
+    Q3 -->|"Vector DB"| CC
+    CA & CB & CC --> DEDUP
+    ORG & DEDUP --> FINAL --> ANS
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef q      fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef chunks fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef merge  fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Why "Fan-Out"?
@@ -563,27 +503,24 @@ not just one that happened to be rank 1 in one list.
 
 ### Complete Flow — Multi-Query + RRF Together:
 
-```
-User Query: "How does auth work?"
-       │
-       ↓
-LLM generates 3 queries (Fan-Out)
-       │
-       ├── Q1 → Vector DB → [d1, d2, d3]
-       ├── Q2 → Vector DB → [d3, d4, d2]
-       └── Q3 → Vector DB → [d5, d2, d1]
-                    │
-                    ↓
-            RRF Ranking Algorithm
-                    │
-                    ↓
-            d2 > d1 = d3 > d5 > d4
-                    │
-                    ↓
-         Top 3: [d2, d1, d3]  ← Most relevant, ranked chunks
-                    │
-                    ↓
-         Original Query + Top Chunks → LLM → Answer
+```mermaid
+flowchart TD
+    UQ(["❓ How does auth work?"]):::input
+    FO["🤖 LLM Fan-Out — 3 query variants"]:::llm
+    Q1["Q1"] --> D1["d1, d2, d3"]:::chunks
+    Q2["Q2"] --> D2["d3, d4, d2"]:::chunks
+    Q3["Q3"] --> D3["d5, d2, d1"]:::chunks
+    RRF["⛓️ RRF Ranking\nd2 > d1 = d3 > d5 > d4"]:::merge
+    TOP["⭐ Top 3: d2, d1, d3"]:::result
+    ANS(["✅ Original Query + Top Chunks → LLM → Answer"]):::output
+    UQ --> FO --> Q1 & Q2 & Q3
+    D1 & D2 & D3 --> RRF --> TOP --> ANS
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef chunks fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef merge  fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef result fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ---
@@ -618,25 +555,24 @@ Chain-of-Thought decomposition means: **break the problem into a step-by-step pl
 > - Think about "Learning" (what is learning?)
 > - Think about "Machine Learning" (combine both)
 
-```
-User Query: "How does machine learning work in recommendation systems?"
-               │
-               ↓
-LLM decomposes into a step-by-step plan:
-               │
-  Step 1: "What is machine learning?" (foundation)
-  Step 2: "What are recommendation systems?" (foundation)
-  Step 3: "What algorithms are used in ML-based recommendations?" (specific)
-  Step 4: "How do collaborative filtering and content-based filtering work?" (detail)
-               │
-               ↓
-Each step → Search Vector DB → Get chunks
-               │
-               ↓
-Each step's chunks → LLM generates a mini-response
-               │
-               ↓
-ALL mini-responses + Original Query → LLM → Final comprehensive answer
+```mermaid
+flowchart TD
+    UQ(["❓ User Query\n'How does ML work in recommendation systems?'"]):::input
+    DE["🤖 LLM decomposes into step-by-step plan"]:::llm
+    S1["Step 1: What is machine learning?"]:::step
+    S2["Step 2: What are recommendation systems?"]:::step
+    S3["Step 3: What ML algorithms are used?"]:::step
+    S4["Step 4: How do collaborative/content-based filtering work?"]:::step
+    MR["Mini-responses from each step 🔍"]:::mid
+    FINAL["🤖 All mini-responses + Original Query → LLM"]:::llm
+    ANS(["✅ Comprehensive Final Answer"]):::output
+    UQ --> DE --> S1 & S2 & S3 & S4
+    S1 & S2 & S3 & S4 -->|"Vector DB search"| MR --> FINAL --> ANS
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm   fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef step  fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef mid   fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Why This Works:
@@ -696,29 +632,25 @@ Instead of answering the specific question directly, first **take a step back** 
 
 ### Step-Back Prompting Diagram:
 
-```
-User Query: "How does JWT refresh token rotation work in Express.js?"
-       │
-       ↓
-Step-Back (More Abstract): "What is JWT authentication and how does it work?"
-       │
-       ↓
-Search Vector DB with STEP-BACK query
-       │
-       ↓
-Get broad context about JWT, auth fundamentals
-       │
-       ↓
-NOW search with ORIGINAL specific query
-       │
-       ↓
-Get specific chunks about refresh token rotation
-       │
-       ↓
-COMBINE: Broad context + Specific chunks + Original Query → LLM
-       │
-       ↓
-Answer grounded in BOTH general principles AND specific details
+```mermaid
+flowchart TD
+    UQ(["❓ Specific Query\n'How does JWT refresh token rotation work in Express.js?'"]):::input
+    SB["⬆️ Step-Back: More Abstract\n'What is JWT authentication and how does it work?'"]:::abstract
+    SBR["Broad context chunks\nJWT fundamentals"]:::broad
+    OR["🔍 Original Query → Vector DB"]:::orig
+    SR["Specific chunks\nrefresh token rotation"]:::specific
+    COMBINE["🔀 Combine\nBroad context + Specific chunks + Original Query → LLM"]:::merge
+    ANS(["✅ Grounded answer — general principles + specific details"]):::output
+    UQ --> SB --> SBR
+    UQ --> OR --> SR
+    SBR & SR --> COMBINE --> ANS
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef abstract fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef broad    fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef orig     fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef specific fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef merge    fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### How It's Different from Decomposition:
@@ -840,40 +772,22 @@ The hypothetical document is **CLOSER in embedding space** to the actual stored 
 
 ### The Architecture:
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                          HyDE                                │
-│                                                              │
-│  User Query: "that serverless thing on AWS"                  │
-│       │                                                      │
-│       ↓                                                      │
-│  ┌─────────────────────────────────────┐                     │
-│  │ LLM generates HYPOTHETICAL DOCUMENT │                     │
-│  │                                     │                     │
-│  │ "AWS Lambda is a serverless compute │                     │
-│  │  service that lets you run code     │                     │
-│  │  without provisioning servers.      │                     │
-│  │  Functions are triggered by events  │                     │
-│  │  like HTTP requests, S3 uploads,    │                     │
-│  │  or DynamoDB stream changes..."     │                     │
-│  └────────────┬────────────────────────┘                     │
-│               ↓                                              │
-│  ┌─────────────────────────┐                                 │
-│  │ Embed the HYPOTHETICAL  │  ← NOT the user's query!        │
-│  │ document → vector       │                                 │
-│  │ [0.82, 0.76, 0.91, ...] │                                 │
-│  └────────────┬────────────┘                                 │
-│               ↓                                              │
-│  ┌─────────────────────────┐                                 │
-│  │ Search Vector DB with   │                                 │
-│  │ this richer embedding   │  → Gets MUCH better matches!    │
-│  └────────────┬────────────┘                                 │
-│               ↓                                              │
-│  ┌─────────────────────────┐                                 │
-│  │ Found chunks + Original │                                 │
-│  │ User Query → LLM       │  → Final answer                 │
-│  └─────────────────────────┘                                 │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    UQ(["❓ User Query\n'that serverless thing on AWS'"]):::input
+    LLM["🤖 LLM generates\nHYPOTHETICAL DOCUMENT\n'AWS Lambda is a serverless compute service...'"]:::llm
+    EMB["Embed the HYPOTHETICAL doc\n→ vector [0.82, 0.76, 0.91...]\n(NOT the user query!)"]:::embed
+    VDB(["🔍 Search Vector DB\nwith richer embedding"]):::db
+    CHUNKS["✅ MUCH better matches!"]:::result
+    FINAL["🤖 Found chunks + Original Query → LLM → Final answer"]:::llm
+    ANS(["✅ Answer"]):::output
+    UQ --> LLM --> EMB --> VDB --> CHUNKS --> FINAL --> ANS
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef embed  fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef db     fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef result fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Important: You Need LARGE, CAPABLE Models
@@ -947,23 +861,17 @@ Not all questions should go to the same data source. **Routing** decides WHERE t
 
 ### The Architecture:
 
-```
-User Query
-    │
-    ↓
-┌──────────────────────┐
-│  ROUTER (LLM-based)  │
-│                      │
-│  Classifies the      │
-│  query type          │
-└───┬──────┬───────┬───┘
-    │      │       │
-    ↓      ↓       ↓
-┌──────┐┌──────┐┌──────┐
-│Vector││Graph ││ SQL  │
-│  DB  ││  DB  ││  DB  │
-│(docs)││(Neo4j)││(data)│
-└──────┘└──────┘└──────┘
+```mermaid
+flowchart TD
+    Q2(["❓ User Query"]):::input --> R["🤖 ROUTER\nLLM classifies query type"]:::router
+    R -->|"docs / concepts"| V(["📚 Vector DB\ndocument search")]:::vector
+    R -->|"relationships"| G(["🕸️ Graph DB\nNeo4j"]):::graph
+    R -->|"numbers / stats"| S(["🗓️ SQL DB\nstructured data"]):::sql
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef vector fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef graph  fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef sql    fill:#f1f8e9,stroke:#8BC34A,color:#33691e
 ```
 
 ### Two Types of Routing:
@@ -1020,15 +928,16 @@ If routed to Vector DB:  Metadata filter: {department: "Engineering", hire_date:
 
 ### Query Construction Types:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   QUERY CONSTRUCTION                        │
-│                                                             │
-│  Natural Language ──→ Text-to-SQL    (Relational DBs)       │
-│                  ──→ Text-to-Cypher  (Graph DBs / Neo4j)    │
-│                  ──→ Text-to-Metadata (Vector DB filters)   │
-│                  ──→ Text-to-API     (REST endpoints)       │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    NL["Natural Language\nUser Query"]:::input
+    SQL["Text-to-SQL\nRelational DBs"]:::target
+    CYP["Text-to-Cypher\nGraph DBs / Neo4j"]:::target
+    META["Text-to-Metadata\nVector DB filters"]:::target
+    API["Text-to-API\nREST endpoints"]:::target
+    NL --> SQL & CYP & META & API
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef target fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
 ```
 
 | Construction | Target | Example |
@@ -1047,48 +956,15 @@ Indexing is about HOW you chunk, embed, and store your documents. Bad indexing �
 
 ### Advanced Indexing Techniques:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   INDEXING TECHNIQUES                        │
-│                                                             │
-│  ┌─────────────────────────────────────┐                    │
-│  │ 1. Multi-Representation Indexing    │                    │
-│  │    Store SUMMARIES for search,      │                    │
-│  │    but retrieve FULL documents      │                    │
-│  │                                     │                    │
-│  │    Summary (embed this)             │                    │
-│  │         ↓                           │                    │
-│  │    search match → return full doc   │                    │
-│  └─────────────────────────────────────┘                    │
-│                                                             │
-│  ┌─────────────────────────────────────┐                    │
-│  │ 2. Parent-Child Indexing            │                    │
-│  │    Small chunks for SEARCH          │                    │
-│  │    Return parent chunk for CONTEXT  │                    │
-│  │                                     │                    │
-│  │    Child (500 chars) → matched      │                    │
-│  │         ↓                           │                    │
-│  │    Return parent (2000 chars)       │                    │
-│  └─────────────────────────────────────┘                    │
-│                                                             │
-│  ┌─────────────────────────────────────┐                    │
-│  │ 3. Specialized Embeddings          │                    │
-│  │    Use DIFFERENT embedding models   │                    │
-│  │    for different data types         │                    │
-│  │                                     │                    │
-│  │    Text → text-embedding model      │                    │
-│  │    Code → code-embedding model      │                    │
-│  │    Tables → table-embedding model   │                    │
-│  └─────────────────────────────────────┘                    │
-│                                                             │
-│  ┌─────────────────────────────────────┐                    │
-│  │ 4. ColBERT (Contextualized Late    │                    │
-│  │    Interaction over BERT)           │                    │
-│  │    Token-level embeddings instead   │                    │
-│  │    of document-level                │                    │
-│  │    → More precise matching          │                    │
-│  └─────────────────────────────────────┘                    │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph IT ["Indexing Techniques"]
+        A["1. Multi-Representation Indexing\nStore SUMMARIES for search,\nretrieve FULL documents"]:::idx
+        B["2. Parent-Child Indexing\nSmall chunks for SEARCH\nReturn parent chunk for CONTEXT"]:::idx
+        C["3. Specialized Embeddings\nText → text embedding model\nCode → code embedding model\nTables → table embedding model"]:::idx
+        D["4. ColBERT\nToken-level embeddings\n→ More precise matching"]:::idx
+    end
+    classDef idx fill:#f1f8e9,stroke:#8BC34A,color:#33691e
 ```
 
 ### In Our Rag_1.py:
@@ -1109,52 +985,35 @@ The actual search phase — how you find and rank the most relevant chunks from 
 
 ### Retrieval Improvement Techniques:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   RETRIEVAL TECHNIQUES                       │
-│                                                             │
-│  1. Re-Ranking                                              │
-│     Initial search → 20 candidates                          │
-│     Cross-encoder re-ranks → Top 5 best                     │
-│                                                             │
-│  2. Hybrid Search                                           │
-│     Vector (semantic) + BM25 (keyword) → Combined results   │
-│                                                             │
-│  3. Corrective RAG (CRAG)                                   │
-│     LLM GRADES each retrieved chunk:                        │
-│     ├── RELEVANT → keep it                                  │
-│     ├── NOT RELEVANT → discard it                           │
-│     └── ALL bad → search web / rewrite query                │
-│                                                             │
-│  4. Active Retrieval                                        │
-│     Model decides WHEN to retrieve:                         │
-│     ├── "I know this" → answer directly                     │
-│     └── "I don't know" → search vector DB                   │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph RT ["Retrieval Techniques"]
+        R1["1. Re-Ranking\nInitial search → 20 candidates\nCross-encoder re-ranks → Top 5"]:::ret
+        R2["2. Hybrid Search\nVector (semantic) + BM25 (keyword)\n→ Combined results"]:::ret
+        R3["3. Corrective RAG (CRAG)\nLLM GRADES each chunk:\n✅ RELEVANT → keep it\n❌ NOT RELEVANT → discard\nAll bad → search web / rewrite"]:::ret
+        R4["4. Active Retrieval\nModel decides WHEN to retrieve:\nI know this → answer directly\nI don't know → search Vector DB"]:::ret
+    end
+    classDef ret fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
 ```
 
 ### Corrective RAG (CRAG) Architecture:
 
-```
-Query → Search Vector DB → Chunks [c1, c2, c3, c4, c5]
-                                    │
-                                    ↓
-                           LLM grades EACH chunk:
-                           c1: RELEVANT ✅
-                           c2: NOT RELEVANT ❌
-                           c3: RELEVANT ✅
-                           c4: AMBIGUOUS 🤔
-                           c5: NOT RELEVANT ❌
-                                    │
-                                    ↓
-                    ┌───────────────┴───────────────┐
-                    ↓                               ↓
-              Most RELEVANT                   Most NOT RELEVANT
-                    ↓                               ↓
-              Use [c1, c3]                    Fallback:
-              for answer                      - Rewrite query
-                                              - Search web
-                                              - Try different DB
+```mermaid
+flowchart TD
+    Q3(["❓ Query"]):::input --> S["Search Vector DB"]:::step
+    S --> C1["c1"] & C2["c2"] & C3["c3"] & C4["c4"] & C5["c5"]
+    C1 -->|"✅ RELEVANT"| USE["Use [c1, c3]\nfor answer"]:::good
+    C2 -->|"❌ NOT RELEVANT"| FALL["Fallback:\nRewrite query\nSearch web\nTry different DB"]:::bad
+    C3 -->|"✅ RELEVANT"| USE
+    C4 -->|"AMBIGUOUS"| FALL
+    C5 -->|"❌ NOT RELEVANT"| FALL
+    USE --> ANS(["✅ Answer"]):::output
+    FALL --> ANS
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step  fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef good  fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
+    classDef bad   fill:#ffebee,stroke:#F44336,color:#b71c1c
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ---
@@ -1167,51 +1026,31 @@ The last stage — the LLM generates the answer from retrieved chunks. But we ca
 
 ### Generation Techniques:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   GENERATION TECHNIQUES                      │
-│                                                             │
-│  1. Self-RAG (Self-Reflective)                              │
-│     LLM generates answer → checks itself:                   │
-│     ├── "Is my answer grounded in the chunks?" → Yes → done │
-│     └── "Am I hallucinating?" → Yes → retrieve more + retry │
-│                                                             │
-│  2. Citation / Grounding                                    │
-│     LLM cites WHICH chunk each sentence came from:          │
-│     "According to chunk 3, the policy allows..."            │
-│                                                             │
-│  3. Chain-of-Thought Generation                             │
-│     LLM reasons step-by-step before answering:              │
-│     "Based on chunk 1, I know X.                            │
-│      Based on chunk 3, I know Y.                            │
-│      Therefore, the answer is Z."                           │
-│                                                             │
-│  4. Faithfulness Check                                      │
-│     Second LLM call verifies the answer against chunks:     │
-│     "Does this answer contain info NOT in the context?"     │
-│     → Yes → flag as potential hallucination                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph GEN ["Generation Techniques"]
+        G1["1. Self-RAG\nGenerate answer → check self:\nIs answer grounded in chunks? → Yes → done\nAm I hallucinating? → Yes → retrieve + retry"]:::gen
+        G2["2. Citation/Grounding\nLLM cites WHICH chunk each sentence came from:\n'According to chunk 3, the policy allows...'"]:::gen
+        G3["3. Chain-of-Thought Generation\nReason step-by-step before answering:\nBased on chunk 1, I know X...\nTherefore, the answer is Z."]:::gen
+        G4["4. Faithfulness Check\nSecond LLM call verifies answer against chunks:\nDoes this answer contain info NOT in context?\n→ Yes → flag as potential hallucination"]:::gen
+    end
+    classDef gen fill:#e0f2f1,stroke:#009688,color:#004d40
 ```
 
 ### Self-RAG Architecture:
 
-```
-Query + Chunks → LLM generates answer
-                      │
-                      ↓
-                 Self-Evaluate:
-                 "Is this answer supported by the chunks?"
-                      │
-              ┌───────┴───────┐
-              ↓               ↓
-          YES → Return     NO → Loop back
-          answer              │
-                              ↓
-                         Retrieve MORE chunks
-                         or DIFFERENT chunks
-                              │
-                              ↓
-                         Try generating again
+```mermaid
+flowchart TD
+    Q4(["❓ Query + Chunks"]):::input --> LLM["🤖 LLM generates answer"]:::llm
+    LLM --> EVAL{"🧠 Self-Evaluate:\nIs answer grounded in chunks?"}:::eval
+    EVAL -->|"YES"| ANS(["✅ Return answer"]):::good
+    EVAL -->|"NO"| MORE["Retrieve MORE or\nDIFFERENT chunks"]:::bad
+    MORE --> LLM
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef llm   fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef eval  fill:#fff8e1,stroke:#FFC107,color:#795548,font-weight:bold
+    classDef good  fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
+    classDef bad   fill:#ffebee,stroke:#F44336,color:#b71c1c
 ```
 
 ---
@@ -1251,51 +1090,55 @@ Query + Chunks → LLM generates answer
 
 ### When to Use What — Decision Matrix:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  USE CASE                    →  TECHNIQUES TO USE           │
-├─────────────────────────────────────────────────────────────┤
-│  Simple coding chatbot       →  Naive RAG (Rag_1.py)        │
-│  Legal document search       →  Step-Back + Decomposition   │
-│                                  + Few-Shot + RRF            │
-│  Exploratory/browse          →  HyDE + Multi-Query           │
-│  Multi-source data           →  Routing + Query Construction │
-│  High-accuracy required      →  CRAG + Self-RAG + Re-Rank    │
-│  Tabular/structured data     →  TAG + Text-to-SQL            │
-│  Relationship-heavy data     →  GraphRAG + Routing            │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph DM ["Use Case Decision Matrix"]
+        U1["Simple coding chatbot\n→ Naive RAG"]:::naive
+        U2["Legal document search\n→ Step-Back + Decomposition + Few-Shot + RRF"]:::legal
+        U3["Exploratory/browse\n→ HyDE + Multi-Query"]:::explore
+        U4["Multi-source data\n→ Routing + Query Construction"]:::multi
+        U5["High-accuracy required\n→ CRAG + Self-RAG + Re-Rank"]:::highAcc
+        U6["Tabular/structured data\n→ TAG + Text-to-SQL"]:::tabular
+        U7["Relationship-heavy data\n→ GraphRAG + Routing"]:::graph
+    end
+    classDef naive   fill:#e8f4fd,stroke:#2196F3,color:#0d47a1
+    classDef legal   fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef explore fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef multi   fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef highAcc fill:#fce4ec,stroke:#E91E63,color:#880e4f
+    classDef tabular fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef graph   fill:#e0f2f1,stroke:#009688,color:#004d40
 ```
 
 ### The Complete Advanced RAG Pipeline:
 
-```
-User Query
-    │
-    ↓
-┌──── QUERY TRANSLATION ────┐
-│ Multi-Query / Step-Back /  │
-│ Decomposition / HyDE       │
-└────────────┬───────────────┘
-             ↓
-┌──── ROUTING ──────────────┐
-│ Where should this go?      │
-│ Vector DB? Graph DB? SQL?  │
-└────────────┬───────────────┘
-             ↓
-┌──── QUERY CONSTRUCTION ───┐
-│ Natural lang → DB language │
-│ Text-to-SQL / Cypher /     │
-│ Metadata filters           │
-└────────────┬───────────────┘
-             ↓
-┌──── RETRIEVAL ────────────┐
-│ Search → RRF Ranking →     │
-│ Re-Rank → CRAG grading     │
-└────────────┬───────────────┘
-             ↓
-┌──── GENERATION ───────────┐
-│ LLM answers with context   │
-│ Self-RAG check →            │
-│ Citations → Final answer    │
-└────────────────────────────┘
+```mermaid
+flowchart TD
+    Q5(["❓ User Query"]):::input
+
+    subgraph QT ["1. Query Translation"]
+        QT1["Multi-Query / Step-Back / Decomposition / HyDE"]:::stage
+    end
+
+    subgraph RT2 ["2. Routing"]
+        RT1["Where should this go?\nVector DB? Graph DB? SQL?"]:::stage
+    end
+
+    subgraph QC ["3. Query Construction"]
+        QC1["Natural lang → DB language\nText-to-SQL / Cypher / Metadata filters"]:::stage
+    end
+
+    subgraph RET ["4. Retrieval"]
+        R1["Search → RRF Ranking → Re-Rank → CRAG grading"]:::stage
+    end
+
+    subgraph GN ["5. Generation"]
+        G1["LLM answers with context\nSelf-RAG check → Citations → Final answer"]:::stage
+    end
+
+    Q5 --> QT --> RT2 --> QC --> RET --> GN --> ANS(["✅ Answer"]):::output
+
+    classDef input fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef stage fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```

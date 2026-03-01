@@ -71,15 +71,31 @@ the best match. Do not explain.
 
 ```mermaid
 flowchart TD
-    Q([User Query]) --> Router["Router (LLM / Rules)"]
-    Router -->|"python_db"| PythonDB["Vector DB: Python"]
-    Router -->|"js_db"| JSDB["Vector DB: JavaScript"]
-    Router -->|"gaming_db"| GameDB["Vector DB: Gaming"]
-    PythonDB --> Retriever
+    Q(["🔍 User Query"]):::input --> Router["🤖 Router\nLLM Classifier / Rules"]:::router
+
+    subgraph DBs [" 🗄️ Vector Databases "]
+        PythonDB[("Python Docs\nDB")]:::db
+        JSDB[("JavaScript Docs\nDB")]:::db
+        GameDB[("Gaming Guides\nDB")]:::db
+    end
+
+    Router -->|"query about Python"| PythonDB
+    Router -->|"query about JS"| JSDB
+    Router -->|"query about gaming"| GameDB
+
+    PythonDB --> Retriever["📦 Retriever\nTop-K Chunks"]:::retriever
     JSDB --> Retriever
     GameDB --> Retriever
-    Retriever --> LLM["LLM (Answer Generation)"]
-    LLM --> Answer([Final Answer])
+
+    Retriever --> LLM["💬 LLM\nAnswer Generation"]:::llm
+    LLM --> Answer(["✅ Final Answer"]):::output
+
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router   fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef db       fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm      fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Key Points
@@ -157,14 +173,31 @@ Your Sales RAG agent supports 3 actions:
 
 ```mermaid
 flowchart TD
-    Q([User Query]) --> SR["Semantic Router"]
-    SR -->|"Intent: View"| P1["Prompt: Show Dashboard"]
-    SR -->|"Intent: Generate"| P2["Prompt: Create Report"]
-    SR -->|"Intent: API Call"| P3["Prompt: Call CRM API"]
-    P1 --> LLM
+    Q(["🔍 User Query"]):::input --> Embed["🔢 Embed Query\n→ Vector"]:::step
+    Embed --> SR["🧭 Semantic Router\nCosine Similarity Match"]:::router
+
+    subgraph Actions [" ⚙️ Available Actions / Prompts "]
+        P1["📊 Show Dashboard\nIntent: View metrics"]:::action
+        P2["📝 Create Report\nIntent: Generate output"]:::action
+        P3["🔌 Call CRM API\nIntent: Fetch/update data"]:::action
+    end
+
+    SR -->|"similarity: 0.92"| P1
+    SR -->|"similarity: 0.87"| P2
+    SR -->|"similarity: 0.74"| P3
+
+    P1 --> LLM["💬 LLM\n+ Matched Prompt"]:::llm
     P2 --> LLM
     P3 --> LLM
-    LLM --> Answer([Response])
+
+    LLM --> Answer(["✅ Response"]):::output
+
+    classDef input   fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step    fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef router  fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef action  fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef llm     fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output  fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Code Example (Embedding-Based Semantic Routing)
@@ -228,18 +261,39 @@ First filter by data type (Code vs Docs), then use an LLM to pick the exact coll
 
 ```mermaid
 flowchart TD
-    Q([User Query]) --> L1["Layer 1: Rule-Based Router"]
-    L1 -->|"Code related"| L2A["Layer 2: LLM Router"]
-    L1 -->|"Documentation"| L2B["Layer 2: LLM Router"]
-    L2A -->|"Python"| PythonDB[(Python DB)]
-    L2A -->|"JavaScript"| JSDB[(JS DB)]
-    L2B -->|"Manuals"| ManualsDB[(Manuals DB)]
-    L2B -->|"API Guides"| GuidesDB[(Guides DB)]
-    PythonDB --> Retriever
+    Q(["🔍 User Query"]):::input --> L1["⚡ Layer 1\nRule-Based Router\nkeyword / regex"]:::layer1
+
+    subgraph CodeBranch [" 💻 Code Branch "]
+        L2A["🤖 Layer 2\nLLM Router"]:::layer2
+        PythonDB[("🐍 Python\nDocs DB")]:::db
+        JSDB[("🟨 JavaScript\nDocs DB")]:::db
+        L2A -->|"Python"| PythonDB
+        L2A -->|"JavaScript"| JSDB
+    end
+
+    subgraph DocsBranch [" 📄 Documentation Branch "]
+        L2B["🤖 Layer 2\nLLM Router"]:::layer2
+        ManualsDB[("📘 Manuals\nDB")]:::db
+        GuidesDB[("📙 API Guides\nDB")]:::db
+        L2B -->|"Manuals"| ManualsDB
+        L2B -->|"API Guides"| GuidesDB
+    end
+
+    L1 -->|"code related"| L2A
+    L1 -->|"documentation"| L2B
+
+    PythonDB --> Retriever["📦 Retriever"]:::retriever
     JSDB --> Retriever
     ManualsDB --> Retriever
     GuidesDB --> Retriever
-    Retriever --> LLM
+    Retriever --> LLM["💬 LLM"]:::llm
+
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef layer1   fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef layer2   fill:#fff8e1,stroke:#FFC107,color:#795548,font-weight:bold
+    classDef db       fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm      fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
 ```
 
 ### When to Use
@@ -267,40 +321,81 @@ LangGraph lets you build a **graph of nodes** where each node performs a specifi
 
 ```mermaid
 flowchart TD
-    Start([User Query]) --> RouterNode["Router Node\n(LLM classifies query)"]
-    RouterNode -->|"route = docs"| DocsNode["Docs Retriever Node"]
-    RouterNode -->|"route = web"| WebNode["Web Retriever Node"]
-    RouterNode -->|"route = youtube"| YTNode["YouTube Retriever Node"]
-    RouterNode -->|"route = graph"| GraphNode["Graph DB Node"]
-    DocsNode --> GeneratorNode["Generator Node\n(LLM generates answer)"]
+    Start(["🔍 User Query"]):::input
+
+    subgraph Stage1 [" 🔀 Stage 1 — Routing "]
+        RouterNode["🤖 Router Node\nLLM classifies query\n→ returns route string"]:::router
+    end
+
+    subgraph Stage2 [" 📥 Stage 2 — Retrieval (Conditional) "]
+        DocsNode["📄 Docs Retriever\nVector DB search"]:::retriever
+        WebNode["🌐 Web Retriever\nLive web search"]:::retriever
+        YTNode["▶️ YouTube Retriever\nTranscript search"]:::retriever
+        GraphNode["🕸️ Graph DB Node\nCypher query"]:::retriever
+    end
+
+    subgraph Stage3 [" ✍️ Stage 3 — Generation "]
+        GeneratorNode["💬 Generator Node\nLLM generates answer\nfrom retrieved context"]:::llm
+    end
+
+    Start --> RouterNode
+    RouterNode -->|"route = docs"| DocsNode
+    RouterNode -->|"route = web"| WebNode
+    RouterNode -->|"route = youtube"| YTNode
+    RouterNode -->|"route = graph"| GraphNode
+
+    DocsNode --> GeneratorNode
     WebNode --> GeneratorNode
     YTNode --> GeneratorNode
     GraphNode --> GeneratorNode
-    GeneratorNode --> End([Final Answer])
+
+    GeneratorNode --> End(["✅ Final Answer"]):::output
+
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router    fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm       fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output    fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Real-World Scenario: Multi-Source RAG Pipeline
 
 ```mermaid
 flowchart TD
-    Q([User Query]) --> Router["Router Node"]
-    Router -->|"PDF"| PDFLoader["PDF Loader"]
-    Router -->|"Web"| WebLoader["Web Loader"]
-    Router -->|"YouTube"| YTLoader["YouTube Loader"]
-    PDFLoader --> Chunker1["Chunking"]
-    WebLoader --> Chunker2["Chunking"]
-    YTLoader --> Chunker3["Chunking"]
-    Chunker1 --> Embed1["Embedding"]
-    Chunker2 --> Embed2["Embedding"]
-    Chunker3 --> Embed3["Embedding"]
-    Embed1 --> VDB1[(Vector DB 1)]
-    Embed2 --> VDB2[(Vector DB 2)]
-    Embed3 --> VDB3[(Vector DB 3)]
-    VDB1 --> Retriever["Retrieval + Re-Ranking"]
+    Q(["🔍 User Query"]):::input --> Router["🤖 Router Node\nRoute by source type"]:::router
+
+    subgraph Ingest [" 📥 Ingestion Pipeline (one-time) "]
+        subgraph PDFBranch["📄 PDF"]
+            PDFLoader["PyPDFLoader"]:::loader --> Chunker1["RecursiveTextSplitter"]:::chunk --> Embed1["OllamaEmbeddings"]:::embed --> VDB1[("Vector\nDB 1")]:::db
+        end
+        subgraph WebBranch["🌐 Web"]
+            WebLoader["WebBaseLoader"]:::loader --> Chunker2["RecursiveTextSplitter"]:::chunk --> Embed2["OllamaEmbeddings"]:::embed --> VDB2[("Vector\nDB 2")]:::db
+        end
+        subgraph YTBranch["▶️ YouTube"]
+            YTLoader["YoutubeLoader"]:::loader --> Chunker3["RecursiveTextSplitter"]:::chunk --> Embed3["OllamaEmbeddings"]:::embed --> VDB3[("Vector\nDB 3")]:::db
+        end
+    end
+
+    Router -->|"PDF"| PDFLoader
+    Router -->|"Web"| WebLoader
+    Router -->|"YouTube"| YTLoader
+
+    VDB1 --> Retriever["📦 Retrieval + Re-Ranking\nTop-K → RRF → Re-Rank"]:::retriever
     VDB2 --> Retriever
     VDB3 --> Retriever
-    Retriever --> Generator["LLM Generator"]
-    Generator --> Answer([Final Answer])
+
+    Retriever --> Generator["💬 LLM Generator"]:::llm
+    Generator --> Answer(["✅ Final Answer"]):::output
+
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router    fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef loader    fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef chunk     fill:#fafafa,stroke:#9E9E9E,color:#424242
+    classDef embed     fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef db        fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm       fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output    fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### LangGraph Code Example
@@ -396,13 +491,24 @@ Graph DB:   "Find entities connected by specific relationships"
 
 ```mermaid
 flowchart TD
-    Q([User Query]) --> Router["Router Node"]
-    Router -->|"Relationship\nquery detected"| GQG["Graph Query Generator\n(NL → Cypher)"]
-    Router -->|"Information\nquery detected"| VR["Vector Retriever"]
-    GQG --> GraphDB[("Graph DB\n(Neo4j)")]
-    GraphDB --> LLM
+    Q(["🔍 User Query"]):::input --> Classify{"🤖 Router\nDetect query type"}:::router
+
+    Classify -->|"📊 Relationship query\n'Who manages Alice?'\n'How are X and Y linked?'"| GQG["🔧 Graph Query Generator\nNatural Language → Cypher\nvia LLM"]:::gen
+    Classify -->|"📖 Information query\n'What is X?'\n'Explain Y'"| VR["📦 Vector Retriever\nSimilarity search\nin Vector DB"]:::retriever
+
+    GQG --> GraphDB[("🕸️ Graph DB\nNeo4j / TigerGraph")]:::graphdb
+    GraphDB --> LLM["💬 LLM\nFormat final answer"]:::llm
     VR --> LLM
-    LLM --> Answer([Final Answer])
+
+    LLM --> Answer(["✅ Final Answer"]):::output
+
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router    fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef gen       fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef graphdb   fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef llm       fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output    fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Step-by-Step Workflow
@@ -421,15 +527,27 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Q([User Query]) --> Router
-    Router -->|"Factual / text search"| VectorDB[(Vector DB)]
-    Router -->|"Relationship / entity"| GraphDB[(Graph DB)]
-    Router -->|"Latest info needed"| WebSearch["Web Search"]
-    VectorDB --> Merger["Context Merger"]
+    Q(["🔍 User Query"]):::input --> Router{"🤖 Router\nLLM classification"}:::router
+
+    Router -->|"📖 Factual / text search"| VectorDB[("📚 Vector DB\nSemantic similarity")]:::db
+    Router -->|"🕸️ Relationship / entity"| GraphDB[("🕸️ Graph DB\nNeo4j / Cypher")]:::graphdb
+    Router -->|"🌐 Latest / real-time info"| WebSearch["🔎 Web Search\nSerpAPI / Tavily"]:::web
+
+    VectorDB --> Merger["🔀 Context Merger\nCombine all results"]:::merge
     GraphDB --> Merger
     WebSearch --> Merger
-    Merger --> LLM
-    LLM --> Answer([Final Answer])
+
+    Merger --> LLM["💬 LLM\nGenerate answer from\ncombined context"]:::llm
+    LLM --> Answer(["✅ Final Answer"]):::output
+
+    classDef input   fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router  fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef db      fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef graphdb fill:#ede7f6,stroke:#673AB7,color:#311b92
+    classDef web     fill:#e1f5fe,stroke:#03A9F4,color:#01579b
+    classDef merge   fill:#fff8e1,stroke:#FFC107,color:#795548
+    classDef llm     fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output  fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### LangChain Code (Neo4j + Natural Language → Cypher)
@@ -469,12 +587,22 @@ print(result["result"])
 
 ```mermaid
 flowchart LR
-    Raw["Raw Data"] --> Load["Load\n(LangChain Loader)"]
-    Load --> Chunk["Chunk\n(Text Splitter)"]
-    Chunk --> Embed["Embed\n(Embedding Model)"]
-    Embed --> Store["Store\n(Vector DB)"]
-    Store --> Retrieve["Retrieve\n(Similarity Search)"]
-    Retrieve --> LLM["LLM\n(Generate Answer)"]
+    Raw["📁 Raw Data\nPDF / Web / YouTube"]:::input
+    Load["📂 Load\nLangChain Loader\nPyPDFLoader etc."]:::step
+    Chunk["✂️ Chunk\nRecursiveTextSplitter\nchunk_size=1000"]:::step
+    Embed["🔢 Embed\nOllama / OpenAI\nEmbeddings"]:::step
+    Store[("🗄️ Store\nVector DB\nChroma / Pinecone")]:::db
+    Retrieve["🔍 Retrieve\nCosine Similarity\nTop-K chunks"]:::step
+    LLM["💬 LLM\nGenerate Answer"]:::llm
+    Answer(["✅ Answer"]):::output
+
+    Raw --> Load --> Chunk --> Embed --> Store --> Retrieve --> LLM --> Answer
+
+    classDef input  fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef step   fill:#f1f8e9,stroke:#8BC34A,color:#33691e
+    classDef db     fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef llm    fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:bold
 ```
 
 ### Loading PDFs
@@ -527,7 +655,82 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.vectorstores import Pinecone
 
 # Create embeddings
-embeddings = OllamaEmbeddings(model="nomic-embed-text", base_url="http://localhost:11434")
+embeddings = OllamaEmbeddings(model="nomic-emflowchart TD
+    Q(["🔍 User Query"]):::input --> Router["🤖 Router\nLLM Classifier / Rules"]:::router
+
+    subgraph DBs [" 🗄️ Vector Databases "]
+        PythonDB[("Python Docs\nDB")]:::db
+        JSDB[("JavaScript Docs\nDB")]:::db
+        GameDB[("Gaming Guides\nDB")]:::db
+    end
+
+    Router -->|"query about Python"| PythonDB
+    Router -->|"query about JS"| JSDB
+    Router -->|"query about gaming"| GameDB
+
+    PythonDB --> Retriever["📦 Retriever\nTop-K Chunks"]:::retriever
+    JSDB --> Retriever
+    GameDB --> Retriever
+
+    Retriever --> LLM["💬 LLM\nAnswer Generation"]:::llm
+    LLM --> Answer(["✅ Final Answer"]):::output
+
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router   fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef db       fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm      fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:boldflowchart TD
+    Q(["🔍 User Query"]):::input --> Router["🤖 Router\nLLM Classifier / Rules"]:::router
+
+    subgraph DBs [" 🗄️ Vector Databases "]
+        PythonDB[("Python Docs\nDB")]:::db
+        JSDB[("JavaScript Docs\nDB")]:::db
+        GameDB[("Gaming Guides\nDB")]:::db
+    end
+
+    Router -->|"query about Python"| PythonDB
+    Router -->|"query about JS"| JSDB
+    Router -->|"query about gaming"| GameDB
+
+    PythonDB --> Retriever["📦 Retriever\nTop-K Chunks"]:::retriever
+    JSDB --> Retriever
+    GameDB --> Retriever
+
+    Retriever --> LLM["💬 LLM\nAnswer Generation"]:::llm
+    LLM --> Answer(["✅ Final Answer"]):::output
+
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router   fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef db       fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm      fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:boldflowchart TD
+    Q(["🔍 User Query"]):::input --> Router["🤖 Router\nLLM Classifier / Rules"]:::router
+
+    subgraph DBs [" 🗄️ Vector Databases "]
+        PythonDB[("Python Docs\nDB")]:::db
+        JSDB[("JavaScript Docs\nDB")]:::db
+        GameDB[("Gaming Guides\nDB")]:::db
+    end
+
+    Router -->|"query about Python"| PythonDB
+    Router -->|"query about JS"| JSDB
+    Router -->|"query about gaming"| GameDB
+
+    PythonDB --> Retriever["📦 Retriever\nTop-K Chunks"]:::retriever
+    JSDB --> Retriever
+    GameDB --> Retriever
+
+    Retriever --> LLM["💬 LLM\nAnswer Generation"]:::llm
+    LLM --> Answer(["✅ Final Answer"]):::output
+
+    classDef input    fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef router   fill:#fff3e0,stroke:#FF9800,color:#e65100,font-weight:bold
+    classDef db       fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef retriever fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20
+    classDef llm      fill:#fce4ec,stroke:#E91E63,color:#880e4f,font-weight:bold
+    classDef output   fill:#e0f2f1,stroke:#009688,color:#004d40,font-weight:boldbed-text", base_url="http://localhost:11434")
 
 # Store in Pinecone
 vectorstore = Pinecone.from_documents(chunks, embeddings, index_name="my-index")
@@ -545,12 +748,22 @@ vectorstore = Chroma.from_documents(chunks, embeddings, persist_directory="./chr
 
 ```mermaid
 flowchart TD
-    Start(["How many data sources?"]) -->|"1 source"| NoRoute["No routing needed"]
-    Start -->|"2-3 sources"| LogRoute["Use Logical Routing\n(LLM classifier)"]
-    Start -->|"Many sources,\ngrouped"| HybRoute["Use Hybrid Routing\n(layered)"]
-    Start -->|"Few fixed\nfeatures/tasks"| SemRoute["Use Semantic Routing\n(intent matching)"]
-    Start -->|"Relationship\ndata"| GraphRoute["Route to Graph DB"]
-    Start -->|"Complex\nmulti-step"| LGRoute["Use LangGraph\n(node-based)"]
+    Start(["🤔 What does your system look like?"]):::input
+
+    Start -->|"Single data source"| NoRoute["✅ No routing needed\nBasic Naive RAG"]:::good
+    Start -->|"2–3 separate DBs\nor collections"| LogRoute["🧭 Logical Routing\nLLM classifier\ncheap model works"]:::logical
+    Start -->|"Many sources\nthat can be grouped"| HybRoute["🔀 Hybrid Routing\nLayered routers\nrules → LLM"]:::hybrid
+    Start -->|"Fixed set of\n3–5 features/tasks"| SemRoute["🔍 Semantic Routing\nEmbedding similarity\nintent matching"]:::semantic
+    Start -->|"Entity/relationship\nqueries"| GraphRoute["🕸️ Route to Graph DB\nNeo4j + Cypher\nNL → query"]:::graph
+    Start -->|"Complex multi-step\npipeline"| LGRoute["⚙️ Use LangGraph\nNode-based graph\nconditional edges"]:::langgraph
+
+    classDef input     fill:#e8f4fd,stroke:#2196F3,color:#0d47a1,font-weight:bold
+    classDef good      fill:#e8f5e9,stroke:#4CAF50,color:#1b5e20,font-weight:bold
+    classDef logical   fill:#fff3e0,stroke:#FF9800,color:#e65100
+    classDef hybrid    fill:#fce4ec,stroke:#E91E63,color:#880e4f
+    classDef semantic  fill:#e3f2fd,stroke:#1976D2,color:#0d47a1
+    classDef graph     fill:#f3e5f5,stroke:#9C27B0,color:#4a148c
+    classDef langgraph fill:#fff8e1,stroke:#FFC107,color:#795548
 ```
 
 ### Quick Reference
