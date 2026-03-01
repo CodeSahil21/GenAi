@@ -909,7 +909,7 @@ import chromadb
 | Use LangChain | Don't Use LangChain |
 |---------------|---------------------|
 | Quick prototyping | Production systems |
-| Need many data loaders | Simple RAG pipeline |
+| Need many data loaders | e |
 | Complex chains with branching | When you need full control |
 | Learning RAG concepts | When debugging matters |
 | Hackathon/demo | Performance-critical apps |
@@ -920,7 +920,7 @@ import chromadb
 
 ### Basic RAG Problems & Solutions:
 
-#### 1. Chunk Size Optimization
+#### 1. Chunk Size OptimizationSimple RAG pipelin
 
 ```
 Too small chunks (100 chars) → Loses context, retrieves fragmented info

@@ -68,7 +68,7 @@ To improve RAG accuracy, we optimize at **6 different stages** of the pipeline:
 │                            ↓                                        │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  3. QUERY CONSTRUCTION                                       │   │
-│  │     Convert natural language → database query language        │   │
+│  │     Convert natural language → database query language       │   │
 │  │     → Text-to-SQL, Text-to-Cypher, Text-to-Metadata          │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                            ↓                                        │
