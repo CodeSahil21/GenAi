@@ -1,27 +1,26 @@
 import json
 import requests
-import subprocess
 from dotenv import load_dotenv
-from openai import OpenAI
+from langfuse.decorators import observe
+from langfuse.openai import openai
 import os
-from langsmith import traceable
-from langsmith.wrappers import wrap_openai
 
+
+from langsmith import traceable
 load_dotenv()
 
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "weather-agent"
-os.environ["LANGCHAIN_API_KEY"] = os.getenv('LANGSMITH_API_KEY')
+# client = wrap_openai(OpenAI())
+client = openai.Client()
 
-client = wrap_openai(OpenAI(api_key=os.getenv('OPENAI_API_KEY')))
-
-@traceable
+@observe()
 def run_command(command):
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    return result.stdout if result.returncode == 0 else result.stderr
+    result = os.system(command=command)
+    return result
 
-@traceable
+
+@observe()
 def get_weather(city: str):
+    # TODO!: Do an actual API Call
     print("🔨 Tool Called: get_weather", city)
     
     url = f"https://wttr.in/{city}?format=%C+%t"
@@ -31,17 +30,10 @@ def get_weather(city: str):
         return f"The weather in {city} is {response.text}."
     return "Something went wrong"
 
+@observe()
 def add(x, y):
     print("🔨 Tool Called: add", x, y)
     return x + y
-
-@traceable(name="openai_chat", run_type="llm")
-def call_openai(messages):
-    return client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
-        messages=messages
-    )
 
 avaiable_tools = {
     "get_weather": {
@@ -96,13 +88,17 @@ while True:
     messages.append({ "role": "user", "content": user_query })
 
     while True:
-        response = call_openai(messages)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            response_format={"type": "json_object"},
+            messages=messages
+        )
 
         parsed_output = json.loads(response.choices[0].message.content)
         messages.append({ "role": "assistant", "content": json.dumps(parsed_output) })
 
         if parsed_output.get("step") == "plan":
-            print(f"🧠: {parsed_output.get('content')}")
+            print(f"🧠: {parsed_output.get("content")}")
             continue
         
         if parsed_output.get("step") == "action":
@@ -115,7 +111,7 @@ while True:
                 continue
         
         if parsed_output.get("step") == "output":
-            print(f"🤖: {parsed_output.get('content')}")
+            print(f"🤖: {parsed_output.get("content")}")
             break
 
 
